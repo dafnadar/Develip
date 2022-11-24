@@ -1,0 +1,88 @@
+#! /bin/bash
+
+successCounter=0
+failureCounter=0
+
+while getopts 'rv' opts 2>/dev/null
+do
+    case $opts in
+        r)
+            recursive=true
+            ;;
+        v)
+            verbose=true
+            ;;
+        ?) 
+            echo -e "Error: An invalid option has been entered.\nUsage: $(basename $0) [-r] [-v] file [file...]" 
+            exit 1
+            ;; 
+    esac
+done
+shift $((OPTIND-1))
+
+declare args=($@)
+
+getFileFormat() {
+    local fileOutput=$(file $1 |tr '[:upper:]' '[:lower:]')
+    IFS=": /'" read -ra outputArr<<< "$fileOutput"
+    echo "${outputArr[1]}"
+}
+
+declare -A supportedFormats=( [gzip]="gunzip -f" [bzip2]="bunzip2 -f" [zip]="unzip -f -q" [compress]="uncompress -f" )
+
+isFormatSupported() {
+    [[ -v supportedFormats[$1] ]] && echo true || echo false
+}
+
+decompress() {
+    ${supportedFormats[$2]} $1 
+}
+
+handleFile() {
+    local fileFormat=$(getFileFormat $1)
+    if $(isFormatSupported $fileFormat); then
+        decompress $1 $fileFormat  
+        successCounter=$((successCounter+1));
+        [[ $verbose ]] && echo Unpaking $1
+    else
+        failureCounter=$((failureCounter+1));
+        [[ $verbose ]] && echo Ignoring $1 
+    fi
+}
+
+travesre() {
+    cd $1;
+    for i in *;
+    do
+        if [ -f $i ]
+        then
+            handleFile $i
+        elif [ -d $i ]; 
+        then
+            [[ $recursive ]] && travesre $i      
+        fi
+    done
+}
+
+main() {
+    for i in "${args[@]}"
+    do
+        if [ -f $i ] 
+        then
+            handleFile $i
+        elif [ -d $i ];
+        then
+            travesre $i
+        else
+            echo "The given argument \"$i\" doesn't exist"
+            exit 2
+        fi
+    done
+    echo "Decompressed " $successCounter "archive(s)"
+    return $failureCounter
+}
+
+[[ $# == 0 ]] &&  exit || main #|| echo "No file / directory entered" 
+
+
+
