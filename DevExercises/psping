@@ -1,0 +1,52 @@
+#! /bin/bash
+
+tFlag=1;
+reg='^[0-9]+$'
+usage="Usage: $(basename $0) [-c ###] [-t ###] [-u user-name] exe-name"
+
+while getopts "c::t::u::" opts 2>/dev/null
+do
+    case $opts in
+        c)
+            cFlag=$OPTARG
+            if ! [[ $cFlag =~ $reg ]] ; then
+              echo -e "Error: cflag Not a number.\n$usage" >&2; exit 1
+            fi
+            ;;
+        t)
+            tFlag=$OPTARG
+            if ! [[ $tFlag =~ $reg ]] ; then
+              echo -e "Error: tflag Not a number.\n$usage" >&2; exit 1
+            fi
+            ;;
+        u)
+            uFlag=$OPTARG
+            ;;
+        ?)
+            echo -e "Error: An invalid option has been entered.\n$usage" 
+            exit 1
+            ;; 
+    esac
+done
+shift $((OPTIND-1))
+exe_name=$1
+
+[[ $# != 1 ]] &&  echo $usage && exit 1
+
+[[ $uFlag ]] && echo "Pinging '$1' for user '$uFlag'" || echo "Pinging '$1' for any user"
+
+pingProcesses() {
+    array=()
+    [ $uFlag ] && command="pgrep -u $uFlag $exe_name"  || command="pgrep $exe_name"
+    mapfile -t array < <( $command)
+    echo "$exe_name: ${#array[@]} instance(s)..." 
+    sleep $tFlag
+}
+
+
+if [[ $cFlag ]]; then
+    for i in $(seq $cFlag); do pingProcesses; done
+else
+    while :; do pingProcesses; done
+fi
+
