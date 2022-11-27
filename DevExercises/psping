@@ -1,11 +1,10 @@
 #! /bin/bash
 
 timeout=1;
-pings_cnt=0
 usage="Usage: $(basename $0) [-c ###] [-t ###] [-u user-name] exe-name";
 
-int_opt_validation() {
-    reg='^[0-9]+$'
+isNumber() {
+    local reg='^[0-9]+$'
     if ! [[ $1 =~ $reg ]] ; then
         echo -e "Error: Not a number - '$1'\n$usage";  
         exit 1
@@ -16,11 +15,11 @@ while getopts "c::t::u::" opts 2>/dev/null
 do
     case $opts in
         c)
-            int_opt_validation $OPTARG
-            pings_amount=$OPTARG
+            isNumber $OPTARG
+            pings_limit=$OPTARG
             ;;
         t)
-            int_opt_validation $OPTARG
+            isNumber $OPTARG
             timeout=$OPTARG
             ;;
         u)
@@ -41,14 +40,14 @@ echo "${ping_for}"
 
 ping_processes() {
     [ $user_name ] && user="-u $user_name"
-    pings_count=$(pgrep $user $1 | wc -l)
-    echo "$1: ${pings_count} instance(s)..." 
+    local processes_number=$(pgrep $user $1 | wc -l)
+    echo "$1: ${processes_number} instance(s)..." 
 }
 
-while [[ true ]]; 
+pings_cnt=0;
+while [[ ! $pings_limit || $pings_cnt < $pings_limit ]]
 do    
     ping_processes $1;
     sleep $timeout;
-    pings_cnt=$(($pings_cnt + 1))
-    [[ $pings_cnt == $pings_amount ]] && break 
+    ((pings_cnt+=1))
 done
