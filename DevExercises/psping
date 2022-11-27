@@ -1,26 +1,29 @@
 #! /bin/bash
 
-tFlag=1;
-reg='^[0-9]+$'
-usage="Usage: $(basename $0) [-c ###] [-t ###] [-u user-name] exe-name"
+timeout=1;
+usage="Usage: $(basename $0) [-c ###] [-t ###] [-u user-name] exe-name";
+
+isNumber() {
+    local reg='^[0-9]+$'
+    if ! [[ $1 =~ $reg ]] ; then
+        echo -e "Error: Not a number - '$1'\n$usage";  
+        exit 1
+    fi            
+}
 
 while getopts "c::t::u::" opts 2>/dev/null
 do
     case $opts in
         c)
-            cFlag=$OPTARG
-            if ! [[ $cFlag =~ $reg ]] ; then
-              echo -e "Error: cflag Not a number.\n$usage" >&2; exit 1
-            fi
+            isNumber $OPTARG
+            pings_limit=$OPTARG
             ;;
         t)
-            tFlag=$OPTARG
-            if ! [[ $tFlag =~ $reg ]] ; then
-              echo -e "Error: tflag Not a number.\n$usage" >&2; exit 1
-            fi
+            isNumber $OPTARG
+            timeout=$OPTARG
             ;;
         u)
-            uFlag=$OPTARG
+            user_name=$OPTARG
             ;;
         ?)
             echo -e "Error: An invalid option has been entered.\n$usage" 
@@ -29,24 +32,22 @@ do
     esac
 done
 shift $((OPTIND-1))
-exe_name=$1
-
 [[ $# != 1 ]] &&  echo $usage && exit 1
 
-[[ $uFlag ]] && echo "Pinging '$1' for user '$uFlag'" || echo "Pinging '$1' for any user"
+ping_for="Pinging '$1' for"
+[[ $user_name ]] && ping_for+=" user '$user_name'" || ping_for+=" any user" 
+echo "${ping_for}"
 
-pingProcesses() {
-    array=()
-    [ $uFlag ] && command="pgrep -u $uFlag $exe_name"  || command="pgrep $exe_name"
-    mapfile -t array < <( $command)
-    echo "$exe_name: ${#array[@]} instance(s)..." 
-    sleep $tFlag
+ping_processes() {
+    [ $user_name ] && user="-u $user_name"
+    local processes_number=$(pgrep $user $1 | wc -l)
+    echo "$1: ${processes_number} instance(s)..." 
 }
 
-
-if [[ $cFlag ]]; then
-    for i in $(seq $cFlag); do pingProcesses; done
-else
-    while :; do pingProcesses; done
-fi
-
+pings_cnt=0;
+while [[ ! $pings_limit || $pings_cnt < $pings_limit ]]
+do    
+    ping_processes $1;
+    sleep $timeout;
+    ((pings_cnt+=1))
+done
